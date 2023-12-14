@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
@@ -18,7 +17,6 @@ var (
 	PingTimeout    = 3 * time.Second
 	ReaperInterval = PingTimeout * 3
 	// StatInterval      = 5 * time.Minute
-	ResurrectInterval = 3 * ReaperInterval
 )
 
 func monitor(ctx context.Context, addr string, ch chan<- Sample) error {
@@ -132,17 +130,5 @@ func monitor(ctx context.Context, addr string, ch chan<- Sample) error {
 		return nil
 	case err := <-cherr:
 		return err
-	}
-}
-
-func MonitorForever(ctx context.Context, addr string, ch chan<- Sample) {
-	for {
-		if err := monitor(ctx, addr, ch); err != nil {
-			log.Printf("monitor for %q failed with error: %s", addr, err.Error())
-			time.Sleep(ResurrectInterval)
-		} else {
-			log.Printf("monitor for %q exited", addr)
-			return
-		}
 	}
 }

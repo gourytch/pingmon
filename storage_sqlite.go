@@ -25,19 +25,28 @@ func NewSqliteStorage(path string) (*SqliteStorage, error) {
 	}
 	if _, err := db.Exec(`
 CREATE TABLE IF NOT EXISTS samples (
-    address  TEXT    NOT NULL,
     at       INTEGER NOT NULL,
+    address  TEXT    NOT NULL,
     rtt      INTEGER NOT NULL,
-    PRIMARY KEY (address, at)
+    PRIMARY KEY (at, address)
 );
 CREATE TABLE IF NOT EXISTS events (
+    at       INTEGER NOT NULL,
+    address  TEXT    NOT NULL,
+    duration INTEGER NOT NULL,
+    state    TEXT    NOT NULL,
+	message  TEXT,
+    PRIMARY KEY (at, address)
+);
+CREATE TABLE IF NOT EXISTS active (
     address  TEXT    NOT NULL,
     at       INTEGER NOT NULL,
     duration INTEGER NOT NULL,
     state    TEXT    NOT NULL,
 	message  TEXT,
-    PRIMARY KEY (address, at)
-);`); err != nil {
+    PRIMARY KEY (address)
+);
+`); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -55,8 +64,9 @@ func (stg *SqliteStorage) Close() error {
 func (stg *SqliteStorage) Add(sample Sample) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
-	_, err := stg.db.Exec(`INSERT INTO samples(address, at, rtt) VALUES (?,?,?)`,
-		sample.Address, sample.At.UnixMicro(), sample.RttMs)
+	t := sample.At.UnixMicro()
+	_, err := stg.db.Exec(`INSERT INTO samples(at, address, rtt) VALUES (?,?,?)`,
+		t, sample.Address, sample.RttMs)
 	return err
 }
 
@@ -93,8 +103,10 @@ func (stg *SqliteStorage) EventRegister(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	t := event.At.UnixMicro()
-	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,?,?,?)`,
-		event.Address, t, event.DurMs(), b2s[event.Online], event.String())
+	_, err := stg.db.Exec(`
+		INSERT INTO events(at, address, duration, state, message)
+		VALUES (?,?,?,?,?)
+		`, t, event.Address, event.DurMs(), b2s[event.Online], event.String())
 	return err
 }
 
@@ -102,8 +114,17 @@ func (stg *SqliteStorage) EventOpen(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	t := event.At.UnixMicro()
-	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,0,?,?)`,
-		event.Address, t, b2s[event.Online], event.String())
+	if _, err := stg.db.Exec(`
+		INSERT OR REPLACE
+		INTO active(at, address, duration, state, message)
+		VALUES (?,?,?,?,?)
+		`, t, event.Address, event.Duration, b2s[event.Online], event.String()); err != nil {
+		return err
+	}
+	_, err := stg.db.Exec(`
+		INSERT INTO events(at, address, duration, state, message)
+		VALUES (?,?,?,?,?)
+		`, t, event.Address, event.Duration, b2s[event.Online], event.String())
 	return err
 }
 
@@ -111,6 +132,13 @@ func (stg *SqliteStorage) EventUpdate(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	t := event.At.UnixMicro()
+	if _, err := stg.db.Exec(`
+		INSERT OR REPLACE
+		INTO active(at, address, duration, state, message)
+		VALUES (?,?,?,?,?)
+		`, t, event.Address, event.Duration, b2s[event.Online], event.String()); err != nil {
+		return err
+	}
 	_, err := stg.db.Exec(`
 		UPDATE events
 		   SET duration = ?,
@@ -126,6 +154,12 @@ func (stg *SqliteStorage) EventClose(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	t := event.At.UnixMicro()
+	if _, err := stg.db.Exec(`
+		DELETE FROM active WHERE address = ?
+		`, event.Address); err != nil {
+		return err
+	}
+
 	_, err := stg.db.Exec(`
 		UPDATE events
 		   SET duration = ?,
