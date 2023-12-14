@@ -1,0 +1,4 @@
+.history/
+*.exe
+*.sqlite
+.env
