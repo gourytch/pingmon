@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"sync"
 	"time"
 
@@ -90,36 +89,35 @@ func (stg *SqliteStorage) Prune(address string, to time.Time) error {
 	return nil
 }
 
-func event2message(event Event) string {
-	return fmt.Sprintf("%s: %s was %s for %d sec", event.At.Format("2006-01-02 15:04:05"), event.Address, b2s[event.Online], event.DurMs()/1000)
-}
-
 func (stg *SqliteStorage) EventRegister(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
+	t := event.At.UnixMicro()
 	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,?,?,?)`,
-		event.Address, event.At.UnixMicro(), event.DurMs(), b2s[event.Online], event2message(event))
+		event.Address, t, event.DurMs(), b2s[event.Online], event.String())
 	return err
 }
 
 func (stg *SqliteStorage) EventOpen(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
-	_, err := stg.db.Exec(`INSERT INTO events(address, at, online) VALUES (?,?,?)`,
-		event.Address, event.At.UnixMicro(), event.Online)
+	t := event.At.UnixMicro()
+	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,0,?,?)`,
+		event.Address, t, b2s[event.Online], event.String())
 	return err
 }
 
 func (stg *SqliteStorage) EventUpdate(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
+	t := event.At.UnixMicro()
 	_, err := stg.db.Exec(`
 		UPDATE events
-		   SET duration = ?
-		   message = ?
-		   WHERE address = ?
+		   SET duration = ?,
+		       message = ?
+		 WHERE address = ?
 		   AND at = ?
-		`, event.DurMs(), event2message(event), event.Address, event.At)
+		`, event.DurMs(), event.String(), event.Address, t)
 	return err
 }
 
@@ -127,12 +125,13 @@ func (stg *SqliteStorage) EventUpdate(event Event) error {
 func (stg *SqliteStorage) EventClose(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
+	t := event.At.UnixMicro()
 	_, err := stg.db.Exec(`
 		UPDATE events
-			SET duration = ?,
-			    message = ?
+		   SET duration = ?,
+			   message = ?
 		WHERE address = ?
 	  	  AND at = ?
-		`, event.DurMs(), event2message(event), event.Address, event.At)
+		`, event.DurMs(), event.String(), event.Address, t)
 	return err
 }

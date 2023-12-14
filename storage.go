@@ -31,11 +31,15 @@ type Event struct {
 }
 
 func (e Event) String() string {
-	return fmt.Sprintf("%s: %s is %s for %d ms", e.At.Format("2006-01-02T15:04:05"), e.Address, b2s[e.Online], e.DurMs())
+	return fmt.Sprintf("host %s was %s from %s for %.1f s", e.Address, b2s[e.Online], e.At.Format("2006-01-02T15:04:05"), e.DurF64())
 }
 
 func (e Event) DurMs() uint64 {
 	return uint64(e.Duration / time.Millisecond)
+}
+
+func (e Event) DurF64() float64 {
+	return float64(e.Duration.Microseconds() / 1000000)
 }
 
 type Adder interface {

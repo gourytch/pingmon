@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -39,9 +40,8 @@ func NewProcessor(storage Storage) *Processor {
 }
 
 func (p *Processor) Process(sample Sample) {
-	if !sample.At.After(NullTime) {
-		log.Printf("bad sample %+v", sample)
-		return
+	if !sample.At.After(NullTime) || sample.Address == "" {
+		panic(fmt.Sprintf("bad sample %#v", sample))
 	}
 	p.evlock.Lock()
 	defer p.evlock.Unlock()
@@ -51,14 +51,15 @@ func (p *Processor) Process(sample Sample) {
 
 	if !ok {
 		// an active event is not found for this address. start the new one
-		p.events[sample.Address] = Event{
+		evt = Event{
 			Address:  sample.Address,
 			At:       sample.At,
 			Duration: 0,
 			Online:   sample.IsOnline(),
 		}
+		p.events[sample.Address] = evt
 		if err := p.storage.EventOpen(evt); err != nil {
-			log.Printf("storage error for %v: %s", evt, err.Error())
+			log.Printf("EventOpen(%v) error: %s", evt, err.Error())
 		}
 		log.Printf("%s is %s", sample.Address, b2s[sample.IsOnline()])
 		return
@@ -76,14 +77,14 @@ func (p *Processor) Process(sample Sample) {
 				// log.Printf("AN ENLARGER: %s", sample)
 				p.events[sample.Address] = evt
 				if err := p.storage.EventUpdate(evt); err != nil {
-					log.Printf("storage error for %v: %s", evt, err.Error())
+					log.Printf("EventUpdate(%v) error: %s", evt, err.Error())
 				}
 				return
 			} else {
 				// switch to the new state
 				// log.Printf("A SWITCHER: %s", sample)
 				if err := p.storage.EventClose(evt); err != nil {
-					log.Printf("storage error for %v: %s", evt, err.Error())
+					log.Printf("EventClose(%v) error: %s", evt, err.Error())
 				}
 				// start the new event
 				p.events[sample.Address] = Event{
@@ -119,7 +120,9 @@ func watch(ctx context.Context, samples <-chan Sample) {
 			return
 		case sample := <-samples:
 			// log.Println(sample.String())
-			stg.Add(sample)
+			if err := stg.Add(sample); err != nil {
+				log.Printf("Add(%v) error: %s", sample, err.Error())
+			}
 			processor.Process(sample)
 		}
 	}
@@ -132,12 +135,17 @@ func test(ctx context.Context, samples chan<- Sample, addr string) {
 }
 
 func main() {
-	hosts := os.Args[1:]
+	hosts := []string{}
+	for _, host := range os.Args[1:] {
+		if host != "" {
+			hosts = append(hosts, host)
+		}
+	}
 	if len(hosts) == 0 {
 		godotenv.Load(".env")
 		s := os.Getenv("HOSTLIST")
 		if s == "" {
-			log.Printf("warning: neither HOSTLIST nor arglist given. Use default hostlist")
+			log.Printf("warning: neither HOSTLIST nor arglist given. I will use the default hostlist")
 			s = DEFAULT_HOSTLIST
 		}
 		for _, host := range strings.Split(s, " ") {
@@ -150,7 +158,7 @@ func main() {
 	if len(hosts) == 0 {
 		panic("there is nothing to monitor")
 	}
-	log.Printf("the next hosts will be monitored: %+v", hosts)
+	log.Printf("the next hosts will be monitored: %#v", hosts)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	samples := make(chan Sample, 100)
