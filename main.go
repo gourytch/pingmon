@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -167,7 +168,7 @@ func main() {
 		test(ctx, samples, host)
 	}
 	osch := make(chan os.Signal, 1)
-	signal.Notify(osch, os.Interrupt)
+	signal.Notify(osch, syscall.SIGINT, syscall.SIGTERM)
 	<-osch
 	log.Println("shutting down...")
 	cancel()
