@@ -95,7 +95,7 @@ func (stg *SqliteStorage) Event(event Event) error {
 	defer stg.mx.Unlock()
 	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,?,?,?)`,
 		event.Address, event.At.UnixMicro(), event.DurMs(), b2s[event.Online],
-		fmt.Sprintf("%s :: %s WAS %s FOR %d sec", event.At.Format("2006-01-02 15:04:05"), event.Address, b2s[event.Online], event.DurMs()/1000))
+		fmt.Sprintf("%s: %s was %s for %d sec", event.At.Format("2006-01-02 15:04:05"), event.Address, b2s[event.Online], event.DurMs()/1000))
 	return err
 }
 
