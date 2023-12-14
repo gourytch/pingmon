@@ -90,12 +90,15 @@ func (stg *SqliteStorage) Prune(address string, to time.Time) error {
 	return nil
 }
 
-func (stg *SqliteStorage) Event(event Event) error {
+func event2message(event Event) string {
+	return fmt.Sprintf("%s: %s was %s for %d sec", event.At.Format("2006-01-02 15:04:05"), event.Address, b2s[event.Online], event.DurMs()/1000)
+}
+
+func (stg *SqliteStorage) EventRegister(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	_, err := stg.db.Exec(`INSERT INTO events(address, at, duration, state, message) VALUES (?,?,?,?,?)`,
-		event.Address, event.At.UnixMicro(), event.DurMs(), b2s[event.Online],
-		fmt.Sprintf("%s: %s was %s for %d sec", event.At.Format("2006-01-02 15:04:05"), event.Address, b2s[event.Online], event.DurMs()/1000))
+		event.Address, event.At.UnixMicro(), event.DurMs(), b2s[event.Online], event2message(event))
 	return err
 }
 
@@ -107,14 +110,29 @@ func (stg *SqliteStorage) EventOpen(event Event) error {
 	return err
 }
 
-func (stg *SqliteStorage) EventClose(event Event) error {
+func (stg *SqliteStorage) EventUpdate(event Event) error {
 	stg.mx.Lock()
 	defer stg.mx.Unlock()
 	_, err := stg.db.Exec(`
 		UPDATE events
 		   SET duration = ?
-		 WHERE address = ?
+		   message = ?
+		   WHERE address = ?
 		   AND at = ?
-		`, event.DurMs(), event.Address, event.At)
+		`, event.DurMs(), event2message(event), event.Address, event.At)
+	return err
+}
+
+// the same as Update
+func (stg *SqliteStorage) EventClose(event Event) error {
+	stg.mx.Lock()
+	defer stg.mx.Unlock()
+	_, err := stg.db.Exec(`
+		UPDATE events
+			SET duration = ?,
+			    message = ?
+		WHERE address = ?
+	  	  AND at = ?
+		`, event.DurMs(), event2message(event), event.Address, event.At)
 	return err
 }

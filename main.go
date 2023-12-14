@@ -25,12 +25,12 @@ const DEFAULT_HOSTLIST = "1.1.1.1 8.8.8.8"
 var NullTime time.Time = time.Time{}
 
 type Processor struct {
-	storage *SqliteStorage
+	storage Storage
 	evlock  sync.Mutex
 	events  map[string]Event
 }
 
-func NewProcessor(storage *SqliteStorage) *Processor {
+func NewProcessor(storage Storage) *Processor {
 	return &Processor{
 		storage: storage,
 		evlock:  sync.Mutex{},
@@ -57,6 +57,9 @@ func (p *Processor) Process(sample Sample) {
 			Duration: 0,
 			Online:   sample.IsOnline(),
 		}
+		if err := p.storage.EventOpen(evt); err != nil {
+			log.Printf("storage error for %v: %s", evt, err.Error())
+		}
 		log.Printf("%s is %s", sample.Address, b2s[sample.IsOnline()])
 		return
 	} else {
@@ -72,11 +75,14 @@ func (p *Processor) Process(sample Sample) {
 				// A continue indicator for the active event. Update it but don't save it
 				// log.Printf("AN ENLARGER: %s", sample)
 				p.events[sample.Address] = evt
+				if err := p.storage.EventUpdate(evt); err != nil {
+					log.Printf("storage error for %v: %s", evt, err.Error())
+				}
 				return
 			} else {
 				// switch to the new state
 				// log.Printf("A SWITCHER: %s", sample)
-				if err := p.storage.Event(evt); err != nil {
+				if err := p.storage.EventClose(evt); err != nil {
 					log.Printf("storage error for %v: %s", evt, err.Error())
 				}
 				// start the new event

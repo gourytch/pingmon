@@ -47,4 +47,9 @@ type Storage interface {
 	ListAddresses() ([]string, error)
 	Filter(address string, from time.Time, to time.Time) ([]Sample, error)
 	Prune(address string, to time.Time) error
+	Add(sample Sample) error
+	EventRegister(event Event) error
+	EventOpen(event Event) error
+	EventUpdate(event Event) error
+	EventClose(event Event) error
 }
