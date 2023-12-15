@@ -45,7 +45,7 @@ func main() {
 	if len(hosts) == 0 {
 		panic("there is nothing to monitor")
 	}
-	log.Printf("the next hosts will be monitored: %#v", hosts)
+	log.Printf("the next hosts will be monitored: %v", hosts)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	watcher := NewWatcher(ctx, "pingmon.sqlite")
