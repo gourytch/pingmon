@@ -66,6 +66,7 @@ func (watcher *Watcher) process(sample Sample) {
 			} else {
 				// switch to the new state
 				// log.Printf("A SWITCHER: %s", sample)
+				log.Println(evt.String())
 				if err := watcher.storage.EventClose(evt); err != nil {
 					log.Printf("EventClose(%v) error: %s", evt, err.Error())
 				}
