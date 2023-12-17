@@ -13,6 +13,11 @@ var b2s map[bool]string = map[bool]string{
 	true:  "ONLINE",
 }
 
+var b2s2 map[bool]string = map[bool]string{
+	false: "went offline",
+	true:  "got online",
+}
+
 type SqliteStorage struct {
 	db *sql.DB
 	mx *sync.Mutex

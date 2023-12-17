@@ -35,7 +35,7 @@ func (e Event) String() string {
 }
 
 func (e Event) DurCut() time.Duration {
-	const div = 100 * time.Millisecond
+	const div = time.Second
 	return (e.Duration / div) * div
 }
 

@@ -66,7 +66,7 @@ func (watcher *Watcher) process(sample Sample) {
 			} else {
 				// switch to the new state
 				// log.Printf("A SWITCHER: %s", sample)
-				log.Println(evt.String())
+				oldevt := evt.String()
 				if err := watcher.storage.EventClose(evt); err != nil {
 					log.Printf("EventClose(%v) error: %s", evt, err.Error())
 				}
@@ -81,7 +81,7 @@ func (watcher *Watcher) process(sample Sample) {
 					log.Printf("EventOpen(%v) error: %s", evt, err.Error())
 				}
 				watcher.events[sample.Address] = evt
-				log.Printf("%s switched to %s", sample.Address, b2s[sample.IsOnline()])
+				log.Printf("%s; %s", oldevt, b2s2[sample.IsOnline()])
 				return
 			}
 			// panic("unreachable point")
@@ -153,11 +153,12 @@ func (watcher *Watcher) AddHost(host string) {
 			if err := monitor(ctx, host, watcher.samples); err != nil {
 				log.Printf("monitoring for %q failed with error: %s", host, err.Error())
 				time.Sleep(ResurrectInterval)
+				log.Printf("resurrect monitoring for %q", host)
 			} else {
-				log.Printf("monitor for %q finished", host)
 				watcher.mutex.Lock()
 				delete(watcher.probers, host)
 				watcher.mutex.Unlock()
+				log.Printf("monitor for %q finished", host)
 				return
 			}
 		}
