@@ -130,6 +130,16 @@ func NewWatcher(ctx context.Context, dbpath string) *Watcher {
 	return watcher
 }
 
+func (watcher *Watcher) LogStatus() {
+	watcher.mutex.Lock()
+	defer watcher.mutex.Unlock()
+	log.Println("--- status ---")
+	for _, event := range watcher.events {
+		log.Println(event.String())
+	}
+	log.Println("---- end ----")
+}
+
 func (watcher *Watcher) AddHost(host string) {
 	if _, ok := watcher.probers[host]; ok {
 		log.Printf("host %s is already under monitoring", host)

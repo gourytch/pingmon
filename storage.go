@@ -31,7 +31,12 @@ type Event struct {
 }
 
 func (e Event) String() string {
-	return fmt.Sprintf("host %s was %s from %s for %.1f s", e.Address, b2s[e.Online], e.At.Format("2006-01-02T15:04:05"), e.DurF64())
+	return fmt.Sprintf("host %s was %s since %s for %s", e.Address, b2s[e.Online], e.At.Format("2006-01-02T15:04:05"), e.DurCut().String())
+}
+
+func (e Event) DurCut() time.Duration {
+	const div = 100 * time.Millisecond
+	return (e.Duration / div) * div
 }
 
 func (e Event) DurMs() uint64 {

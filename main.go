@@ -58,5 +58,6 @@ func main() {
 	log.Println("shutting down...")
 	cancel()
 	watcher.wg.Wait()
+	watcher.LogStatus()
 	log.Println("done.")
 }
